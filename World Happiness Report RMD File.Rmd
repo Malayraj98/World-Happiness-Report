@@ -1,0 +1,389 @@
+---
+title: "World Happiness Data"
+author: "Malay Raj"
+date: "2023-05-13"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+## WORLD HAPPINESS DATA:
+
+This analysis is based on the World Happiness case study "'Sophisticated, Clear,
+and Polished': World Happiness data and Data Visualization".
+
+## Installing required packages
+
+Installing and loading common packages and libraries.
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+```{r}
+library(readr)
+library(readxl)
+library(dplyr)
+library(plyr)
+library(skimr)
+library(tidyr)
+library(reshape2)
+library(stringr)
+library(e1071)
+library(pROC)
+library(corrplot)
+library(GGally)
+```
+
+
+
+## Loading the data
+
+The data which is being loaded here are World Happiness Data from the year 2015-2019.
+
+```{r}
+q1_2015 = read.csv ("C:/Users/KIIT/OneDrive/Desktop/Happiness Data/2015.csv")
+q2_2016 = read.csv ("C:/Users/KIIT/OneDrive/Desktop/Happiness Data/2016.csv")
+q3_2017 = read.csv ("C:/Users/KIIT/OneDrive/Desktop/Happiness Data/2017.csv")
+q4_2018 = read.csv ("C:/Users/KIIT/OneDrive/Desktop/Happiness Data/2018.csv")
+q5_2019 = read.csv ("C:/Users/KIIT/OneDrive/Desktop/Happiness Data/2019.csv")
+```
+
+## Looking at the data of the year 2019.
+
+```{r}
+head(q5_2019)
+```
+
+## Renaming columns:
+
+Renaming few columns of year 2018, 2019 according to the columns of year 2015, 2016 and 2017.
+
+```{r}
+q4_2018=plyr::rename(q4_2018, replace = c( "Country.or.region"="Country", 
+                                                 "Overall.rank"="Happiness.Rank" ,
+                                                 "GDP.per.capita"="Economy..GDP.per.Capita.",
+                                                 "Healthy.life.expectancy"="Health..Life.Expectancy.",
+                                                 "Freedom.to.make.life.choices"="Freedom",
+                                                 "Perceptions.of.corruption"="Trust..Government.Corruption.",
+                                                 "Social.support"="Family",
+                                                 "Score"="Happiness.Score"))
+```
+
+```{r}
+q5_2019=plyr::rename(q5_2019, replace = c( "Country.or.region"="Country", 
+                                                 "Overall.rank"="Happiness.Rank" ,
+                                                 "GDP.per.capita"="Economy..GDP.per.Capita.",
+                                                 "Healthy.life.expectancy"="Health..Life.Expectancy.",
+                                                 "Freedom.to.make.life.choices"="Freedom",
+                                                 "Perceptions.of.corruption"="Trust..Government.Corruption.",
+                                                 "Social.support"="Family",
+                                                 "Score"="Happiness.Score"))
+```
+
+Viewing the column names of all the years.
+
+```{r}
+colnames(q1_2015)
+colnames(q2_2016)
+colnames(q3_2017)
+colnames(q4_2018)
+colnames(q5_2019)
+```
+
+## Inspect the dataframes and look for inconguencies.
+
+```{r}
+str(q1_2015)
+str(q2_2016)
+str(q3_2017)
+str(q4_2018)
+str(q5_2019)
+```
+
+## Inserting 'Year' column at 0th index.
+
+```{r}
+q1_2015<-cbind(Year=2015,q1_2015)
+q2_2016<-cbind(Year=2016,q2_2016)
+q3_2017<-cbind(Year=2017,q3_2017)
+q4_2018<-cbind(Year=2018,q4_2018)
+q5_2019<-cbind(Year=2019,q5_2019)
+```
+
+## Changing datatype of Trust..Government.Corruption. to numeric and inspecting it.
+
+```{r}
+q4_2018$Trust..Government.Corruption. = as.numeric(q4_2018$Trust..Government.Corruption.)
+
+str(q4_2018)
+```
+
+## Binding all the dataframes from the year 2015-2019 into a single dataframe for further analysis.
+
+```{r}
+q15_16<-dplyr::bind_rows(q1_2015,q2_2016)
+q15_16_17<-dplyr::bind_rows(q15_16,q3_2017)
+q18_19<-dplyr::bind_rows(q4_2018,q5_2019)
+q<-dplyr::bind_rows(q18_19,q15_16_17)
+```
+
+Viewing the new dataframe 'q'.
+
+```{r}
+head(q)
+```
+
+## Changing datatype of Happiness.Rank into numeric and then inspecting the dataframe.
+
+```{r}
+q$Happiness.Rank  = as.numeric(q$Happiness.Rank )
+
+str(q)
+```
+
+## Counting the number of NULL values in all the columns of q dataframe.
+
+```{r}
+colSums(is.na(q))
+```
+
+## Removing the unnecessary columns.
+
+```{r}
+q = subset(q, select = -c(Lower.Confidence.Interval,Upper.Confidence.Interval,Dystopia.Residual,Standard.Error,Whisker.high,Whisker.low))
+```
+
+Again counting the number of NULL values in columns after removing the unncessary ones.
+
+```{r}
+colSums(is.na(q))
+```
+
+## Impute with mean or median values for numerical columns and then checking for the NULL values of all the columns.
+
+```{r}
+q$Trust..Government.Corruption.[is.na(q$Trust..Government.Corruption.)] <- median(q$Trust..Government.Corruption., na.rm = T)
+
+colSums(is.na(q))
+```
+
+## Counting number of countries of every years.
+
+```{r}
+aggregate(q$Country, by=list(q$Year), FUN=length)
+```
+
+From the table shown as above, the number of countries involved in this dataset for different year is different. Therefore, it is necessary to make an intersection of them to get the most common country list.
+
+```{r}
+Country_2015 = subset(q, Year == 2015)$Country
+Country_2016 = subset(q, Year == 2016)$Country
+Country_2017 = subset(q, Year == 2017)$Country
+Country_2018 = subset(q, Year == 2018)$Country
+Country_2019 = subset(q, Year == 2019)$Country
+
+common_country =intersect(intersect(intersect(intersect(Country_2015,Country_2016),Country_2017),Country_2018),Country_2019)
+length(common_country)
+```
+
+Therefore, there are 141 countries’ data existing across from 2015-2019 in this dataset.Then we need to filter the original dataset by this common_country list.
+
+```{r}
+q1 = subset(q,Country %in% common_country)
+print(paste("The amount of rows in the dataset is: ",dim(q1)[1]))
+print(paste("The amount of columns in the dataset is: ",dim(q1)[2]))
+```
+
+## Creating a new dataset for storing common region and country.
+
+```{r}
+common_region <- unique(subset(q1, Region!="NA", c(Country, Region)))
+
+head(common_country)
+```
+
+## Filling relate region to missing value of region column.
+
+```{r}
+assign_region <- function(x){
+  Region <- common_region$Region[common_region$Country == x]
+}
+
+for(country in common_country)
+  q1$Region[q1$Country == country] <- assign_region(country)
+```
+
+## Saving the clean Dataset for further Data Visualization in Tableau.
+
+```{r}
+library(readr)
+write_csv(q1, path = "World Happiness Data 2015__2019_cleaned.csv")
+```
+
+## Viewing the statistics of the dataset.
+
+```{r}
+skimr::skim_without_charts(q1)
+```
+
+## Checking the number of rows, columns and all the column names.
+
+```{r}
+print(paste("The amount of rows in the dataset is: ",dim(q)[1]))
+print(paste("The amount of columns in the dataset is: ",dim(q)[2]))
+print(paste("the column names in this dataset are:", paste(shQuote(colnames(q)), collapse=", ")))
+```
+
+## MOVING ON FURTHER WITH DATA VISUALIZATION:
+
+Checking the top 5 countries of the year 2015-2019 in terms of their happiness score.
+
+```{r}
+q1 %>%
+  filter(Year == 2015) %>%
+  arrange(-Happiness.Score) %>%
+  slice_head(n=5) %>%
+  ggplot(aes(reorder(Country, Happiness.Score), Happiness.Score)) +
+  geom_point(colour = "blue", size = 3) +
+  theme(text=element_text(size=10)) + 
+  coord_flip() +
+  labs(title = "The 5 happiest countries in 2015", x = "")
+```
+
+```{r}
+q1 %>%
+  filter(Year == 2016) %>%
+  arrange(-Happiness.Score) %>%
+  slice_head(n=5) %>%
+  ggplot(aes(reorder(Country, Happiness.Score), Happiness.Score)) +
+  geom_point(colour = "blue", size = 3) +
+  theme(text=element_text(size=10)) + 
+  coord_flip() +
+  labs(title = "The 5 happiest countries in 2016", x = "")
+```
+
+```{r}
+q1 %>%
+  filter(Year == 2017) %>%
+  arrange(-Happiness.Score) %>%
+  slice_head(n=5) %>%
+  ggplot(aes(reorder(Country, Happiness.Score), Happiness.Score)) +
+  geom_point(colour = "blue", size = 3) +
+  theme(text=element_text(size=10)) + 
+  coord_flip() +
+  labs(title = "The 5 happiest countries in 2017", x = "")
+```
+
+```{r}
+q1 %>%
+  filter(Year == 2018) %>%
+  arrange(-Happiness.Score) %>%
+  slice_head(n=5) %>%
+  ggplot(aes(reorder(Country, Happiness.Score), Happiness.Score)) +
+  geom_point(colour = "blue", size = 3) +
+  theme(text=element_text(size=10)) + 
+  coord_flip() +
+  labs(title = "The 5 happiest countries in 2018", x = "")
+```
+
+```{r}
+q1 %>%
+  filter(Year == 2019) %>%
+  arrange(-Happiness.Score) %>%
+  slice_head(n=5) %>%
+  ggplot(aes(reorder(Country, Happiness.Score), Happiness.Score)) +
+  geom_point(colour = "blue", size = 3) +
+  theme(text=element_text(size=10)) + 
+  coord_flip() +
+  labs(title = "The 5 happiest countries in 2019", x = "")
+```
+
+## Checking Mean Happiness Score of all the Regions.
+
+```{r}
+ggplot(q1 , aes(x = Region, y = Happiness.Score)) +
+  geom_boxplot(aes(fill=Region)) + theme_bw() +
+  theme(axis.text.x = element_text (angle = 90))
+```
+
+## Using Scatterplot to find the relationship between Happiness Score and Economy.
+
+```{r}
+ggplot(q1, aes(x = Economy..GDP.per.Capita., y = Happiness.Score)) + 
+  geom_point() +  
+  geom_smooth(method = "lm", fullrange = TRUE) +
+  theme_bw() + labs(title = "Economy VS Happines Score")
+```
+
+## Using Scatterplot to find the relationship between Happiness Score and Family.
+
+```{r}
+ggplot(q1, aes(x = Family, y = Happiness.Score)) + 
+  geom_point() +  
+  geom_smooth(method = "lm", fullrange = TRUE) +
+  theme_bw() + labs(title = "Family VS Happines Score")
+```
+
+## Using Scatterplot to find the relationship between Happiness Score and Health.
+
+```{r}
+ggplot(q1, aes(x = Health..Life.Expectancy., y = Happiness.Score)) + 
+  geom_point() +  
+  geom_smooth(method = "lm") +
+  labs(title = "Health VS Happiness Score")
+```
+
+## Using Scatterplot to find the relationship between Happiness Score and Freedom.
+
+```{r}
+ggplot(q1, aes(x = Freedom, y = Happiness.Score)) + 
+  geom_point() +  
+  geom_smooth(method = "lm") +
+  labs(title = "Freedom VS Happiness Score")
+```
+
+## Using Scatterplot to find the relationship between Happiness Score and Trust.
+
+```{r}
+ggplot(q1, aes(x = Trust..Government.Corruption., y = Happiness.Score)) + 
+  geom_point() +  
+  geom_smooth(method = "lm") +
+  labs(title = "Trust VS Happiness Score")
+```
+
+## Using Scatterplot to find the relationship between Happiness Score and Generosity.
+
+```{r}
+ggplot(q1, aes(x = Generosity, y = Happiness.Score)) + 
+  geom_point() +  
+  geom_smooth(method = "lm") +
+  labs(title = "Generosity VS Happiness Score")
+```
+
+## Droping columns based on Heatmap Correlation.
+
+We are removing Year, Country, Happiness.Rank, Region column before making heatmap and storing it in a new dataframe called 'df'.
+
+```{r}
+df = select(q1,-c("Year","Country","Happiness.Rank","Region"))
+
+head(df)
+```
+
+## Computing the heatmap.
+
+```{r}
+Num.cols <- sapply(df, is.numeric)
+Cor.data <- cor(df[, Num.cols])
+
+corrplot(Cor.data, method = 'color') 
+```
+
+## Computing Correlation heatmap.
+
+```{r}
+ggcorr(df, label = TRUE, label_round = 2, label_size = 3.5, size = 2, hjust = .85) + ggtitle("Correlation Heatmap") + theme(plot.title = element_text(hjust = 0.5))
+```
+
